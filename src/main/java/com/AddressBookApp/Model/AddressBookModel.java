@@ -1,4 +1,4 @@
-package com.AddressBookApp.model;
+package com.AddressBookApp.Model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

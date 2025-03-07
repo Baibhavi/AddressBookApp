@@ -1,4 +1,4 @@
-package com.AddressBookApp.dto;
+package com.AddressBookApp.DTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

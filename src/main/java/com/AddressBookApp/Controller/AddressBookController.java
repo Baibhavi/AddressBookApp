@@ -9,10 +9,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/addressBook")
+@RequestMapping("/addressbook")
 public class AddressBookController {
     @Autowired
-    private AddressBookService service;
+    AddressBookServiceInterface service;
+
 
     //Get all contacts
     @GetMapping("/showcontacts")

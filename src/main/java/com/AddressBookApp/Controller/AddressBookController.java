@@ -1,8 +1,10 @@
 package com.AddressBookApp.Controller;
 
 import com.AddressBookApp.DTO.AddressBookDTO;
+import com.AddressBookApp.DTO.ResponseDTO;
 import com.AddressBookApp.Interface.AddressBookServiceInterface;
 import com.AddressBookApp.Service.AddressBookService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,15 +33,16 @@ public class AddressBookController {
 
     // Create a new contact
     @PostMapping("/create")
-    public ResponseEntity<AddressBookDTO> createContact(@RequestBody AddressBookDTO dto) {
-        return ResponseEntity.ok(service.saveContact(dto));
+    public ResponseEntity<?> createContact(@Valid @RequestBody AddressBookDTO dto) {
+        AddressBookDTO createContact = service.saveContact(dto);
+        return ResponseEntity.ok(new ResponseDTO("Contact created sucessfully", createContact));
     }
 
     // Update an existing contact
     @PutMapping("/update/{id}")
-    public ResponseEntity<AddressBookDTO> updateContact(@PathVariable Long id, @RequestBody AddressBookDTO dto) {
+    public ResponseEntity<?> updateContact(@PathVariable Long id, @Valid @RequestBody AddressBookDTO dto) {
         AddressBookDTO updatedContact = service.updateContact(id, dto);
-        return (updatedContact != null) ? ResponseEntity.ok(updatedContact) : ResponseEntity.notFound().build();
+        return (updatedContact != null) ? ResponseEntity.ok(new ResponseDTO("Contact updated sucessfully", updatedContact)) : ResponseEntity.notFound().build();
     }
 
     // Delete a contact

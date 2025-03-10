@@ -41,7 +41,6 @@ build/
 
 ### VS Code ###
 .vscode/
-application
 
 # OS-specific files
 .DS_Store

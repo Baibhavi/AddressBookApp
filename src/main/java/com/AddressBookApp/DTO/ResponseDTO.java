@@ -1,13 +1,20 @@
 package com.AddressBookApp.DTO;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
-@AllArgsConstructor
+@Getter
+@Setter
 @NoArgsConstructor
+
 public class ResponseDTO {
     private String message;
-    private Object object;
+    private Object data;
+
+    public ResponseDTO(String message, Object data) {
+        this.message = message;
+        this.data = data;
+    }
 }

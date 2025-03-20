@@ -17,8 +17,7 @@ public class AddressBookController {
     @Autowired
     AddressBookServiceInterface service;
 
-
-    //Get all contacts
+    // Get all contacts
     @GetMapping("/showcontacts")
     public ResponseEntity<List<AddressBookDTO>> getAllContacts() {
         return ResponseEntity.ok(service.getAllContacts());
@@ -31,23 +30,27 @@ public class AddressBookController {
         return (contact != null) ? ResponseEntity.ok(contact) : ResponseEntity.notFound().build();
     }
 
-    // Create a new contact
+    // Create a new contact (Validation Applied)
     @PostMapping("/create")
     public ResponseEntity<?> createContact(@Valid @RequestBody AddressBookDTO dto) {
-        AddressBookDTO createContact = service.saveContact(dto);
-        return ResponseEntity.ok(new ResponseDTO("Contact created sucessfully", createContact));
+        AddressBookDTO createdContact = service.saveContact(dto);
+        return ResponseEntity.ok(new ResponseDTO("Contact created successfully", createdContact));
     }
 
-    // Update an existing contact
+    // Update an existing contact (Validation Applied)
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateContact(@PathVariable Long id, @Valid @RequestBody AddressBookDTO dto) {
         AddressBookDTO updatedContact = service.updateContact(id, dto);
-        return (updatedContact != null) ? ResponseEntity.ok(new ResponseDTO("Contact updated sucessfully", updatedContact)) : ResponseEntity.notFound().build();
+        return (updatedContact != null)
+                ? ResponseEntity.ok(new ResponseDTO("Contact updated successfully", updatedContact))
+                : ResponseEntity.notFound().build();
     }
 
     // Delete a contact
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteContact(@PathVariable Long id) {
-        return (service.deleteContact(id)) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+        return (service.deleteContact(id))
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
     }
 }

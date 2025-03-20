@@ -1,8 +1,8 @@
 package com.AddressBookApp.Repository;
 
 import com.AddressBookApp.Model.AddressBookModel;
-import org.springframework.data.jpa.repository.JpaRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository

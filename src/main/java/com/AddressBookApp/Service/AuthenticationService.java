@@ -7,8 +7,10 @@ import com.AddressBookApp.Repository.AuthenticationRepository;
 import com.AddressBookApp.Model.AuthUser;
 import com.AddressBookApp.Util.EmailSenderService;
 import com.AddressBookApp.Util.jwttoken;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,10 +25,14 @@ public class AuthenticationService implements IAuthenticationService {
     jwttoken tokenUtil;
 
     @Autowired
-    EmailSenderService emailSenderService;
+    RabbitmqPubliser rabbitmqPublisher;  //  Inject RabbitMQ Publisher
+
+    @Autowired
+    RedisService redisTokenService;
 
     BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+    // ===================== REGISTER USER =====================
     @Override
     public AuthUser register(AuthUserDTO userDTO) throws Exception {
         try {
@@ -35,105 +41,101 @@ public class AuthenticationService implements IAuthenticationService {
 
             String encryptedPassword = passwordEncoder.encode(userDTO.getPassword());
             user.setPassword(encryptedPassword);
-
-            String token = tokenUtil.createToken(user.getUserId());
             authUserRepository.save(user);
 
-            emailSenderService.sendEmail(user.getEmail(), "Registered in AddressBook App", "Hi "
-                    + user.getFirstName() + ",\nYou have been successfully registered!\n\nYour registered details are:\n\n User Id:  "
-                    + user.getUserId() + "\n First Name:  "
-                    + user.getFirstName() + "\n Last Name:  "
-                    + user.getLastName() + "\n Email:  "
-                    + user.getEmail() + "\n Token:  " + token);
-            log.info("User {} registeres successfully", user.getEmail());
+            String token = tokenUtil.createToken(user.getUserId());
+            redisTokenService.saveToken(user.getUserId().toString(), token); // Store in Redis
+
+            //  Publish event to RabbitMQ
+            rabbitmqPublisher.sendMessage("userQueue", "New user registered: " + user.getEmail());
+
+            log.info("User {} registered successfully.", user.getEmail());
             return user;
-        }catch (Exception e) {
-            log.error("Error occurred while registering user: {}", e.getMessage());
-            throw new UserException("Registration failed due to an internal error. Please try again.");
+        } catch (Exception e) {
+            log.error("Error during registration: {}", e.getMessage());
+            throw new UserException("Registration failed. Please try again.");
         }
     }
 
+    // ===================== LOGIN USER =====================
     @Override
-    public String login(LoginDTO loginDTO) {
+    public String login(LoginDTO loginDTO, HttpServletResponse response) {
         try {
             log.info("Login attempt for email: {}", loginDTO.getEmail());
             Optional<AuthUser> user = Optional.ofNullable(authUserRepository.findByEmail(loginDTO.getEmail()));
 
-            if (user.isPresent()) {
-                if (passwordEncoder.matches(loginDTO.getPassword(), user.get().getPassword())) {
-                    log.info("Login successful for user: {}", user.get().getEmail());
-                    emailSenderService.sendEmail(user.get().getEmail(), "Logged in Successfully!", "Hi "
-                            + user.get().getFirstName() + ",\n\nYou have successfully logged in into AddressBook App!");
+            if (user.isPresent() && passwordEncoder.matches(loginDTO.getPassword(), user.get().getPassword())) {
+                log.info("Login successful for user: {}", user.get().getEmail());
 
-                    return "Congratulations!! You have logged in successfully!";
-                } else {
-                    log.warn("Login failed: Incorrect password for email: {}", loginDTO.getEmail());
-                    throw new UserException("Sorry! Email or Password is incorrect!");
-                }
+                String token = tokenUtil.createToken(user.get().getUserId()); // Generate JWT token
+                redisTokenService.saveToken(user.get().getUserId().toString(), token);
+
+                response.addHeader("Authorization", "Bearer : "+token);
+                rabbitmqPublisher.sendMessage("loginQueue", "User logged in: " + user.get().getEmail());
+
+                return "user logged in" + "\ntoken : " + token;   //
             } else {
-                log.warn("Login failed: No user found for email: {}", loginDTO.getEmail());
-                throw new UserException("Sorry! Email or Password is incorrect!");
+                throw new UserException("Incorrect email or password.");
             }
-        }catch (Exception e) {
-            log.error("Error during login process: {}", e.getMessage());
-            throw new UserException("Login failed due to an internal error. Please try again.");
+        } catch (Exception e) {
+            log.error("Login error: {}", e.getMessage());
+            throw new UserException("Login failed due to an internal error.");
         }
     }
 
+
+    // ===================== FORGOT PASSWORD =====================
     @Override
+    @CacheEvict(value = "authTokens", key = "#email")
     public String forgotPassword(String email, String newPassword) {
         try {
             log.info("Processing forgot password request for email: {}", email);
             AuthUser user = authUserRepository.findByEmail(email);
+
             if (user == null) {
-                log.warn("Forgot password request failed: No user found for email: {}", email);
-                throw new UserException("Sorry! We cannot find the user email: " + email);
+                throw new UserException("User not found with email: " + email);
             }
+
             String encryptedPassword = passwordEncoder.encode(newPassword);
             user.setPassword(encryptedPassword);
-
             authUserRepository.save(user);
 
-            emailSenderService.sendEmail(user.getEmail(),
-                    "Password Forget updation Successful",
-                    "Hi " + user.getFirstName() + ",\n\nYour password has been successfully changed!");
+            redisTokenService.deleteToken(user.getUserId().toString());
 
-            log.info("Password updated successfully for email: {}", email);
+            //  Publish password reset event to RabbitMQ
+            rabbitmqPublisher.sendMessage("passwordQueue", "Password reset for user: " + email);
+
             return "Password has been changed successfully!";
-        }
-        catch (Exception e) {
-            log.error("Error during forgot password process: {}", e.getMessage());
-            throw new UserException("Error occurred while updating password. Please try again.");
+        } catch (Exception e) {
+            log.error("Error updating password: {}", e.getMessage());
+            throw new UserException("Password reset failed.");
         }
     }
     @Override
+    @CacheEvict(value = "authTokens", key = "#email")
     public String resetPassword(String email, String currentPassword, String newPassword) {
         try {
             log.info("Resetting password for email: {}", email);
             AuthUser user = authUserRepository.findByEmail(email);
-            if (user == null) {
-                log.warn("Password reset failed: No user found for email: {}", email);
-                throw new UserException("User not found with email: " + email);
+
+            if (user == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+                throw new UserException("Incorrect email or current password.");
             }
 
-            if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-                log.warn("Password reset failed: Incorrect current password for email: {}", email);
-                throw new UserException("Current password is incorrect!");
-            }
             String encryptedPassword = passwordEncoder.encode(newPassword);
             user.setPassword(encryptedPassword);
             authUserRepository.save(user);
 
-            emailSenderService.sendEmail(user.getEmail(),
-                    "Password Reset Successful",
-                    "Hi " + user.getFirstName() + ",\n\nYour password has been successfully updated!");
+            // Invalidate old token in Redis
+            redisTokenService.deleteToken(user.getUserId().toString());
 
-            log.info("Password reset successful for email: {}", email);
+            // Publish password reset event to RabbitMQ
+            rabbitmqPublisher.sendMessage("passwordQueue", "User reset password: " + email);
+
             return "Password reset successfully!";
-        }catch (Exception e) {
-            log.error("Error during password reset process: {}", e.getMessage());
-            throw new UserException("Error occurred while resetting password. Please try again.");
+        } catch (Exception e) {
+            log.error("Error resetting password: {}", e.getMessage());
+            throw new UserException("Password reset failed.");
         }
     }
-
 }

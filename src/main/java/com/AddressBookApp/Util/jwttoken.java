@@ -17,7 +17,7 @@ public class jwttoken {
     @Value("${jwt.secret}")
     private String TOKEN_SECRET;
 
-    private static final long ACCESS_TOKEN_EXPIRATION = 60000; // 1 minute (60,000 ms)
+    private static final long ACCESS_TOKEN_EXPIRATION = 300000; // 5 minute
     private static final long REFRESH_TOKEN_EXPIRATION = 604800000; // 7 days
     private static final String ISSUER = "AddressBookApp";
 

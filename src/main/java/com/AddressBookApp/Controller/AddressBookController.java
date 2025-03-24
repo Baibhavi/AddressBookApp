@@ -13,6 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/addressbook")
+@CrossOrigin(origins = "http://localhost:4200")
 public class AddressBookController {
     @Autowired
     AddressBookServiceInterface service;

@@ -26,7 +26,7 @@ public class jwttoken {
         try {
             Algorithm algorithm = Algorithm.HMAC256(TOKEN_SECRET);
 
-            long expirationMillis = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(1);
+            long expirationMillis = System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION;
 
             String token = JWT.create()
                     .withClaim("user_id", id)
